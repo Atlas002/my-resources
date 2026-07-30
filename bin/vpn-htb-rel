@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+openvpn --config /opt/my-resources/vpns/release_arena_Atlas02.ovpn --daemon

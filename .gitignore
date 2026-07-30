@@ -1,0 +1,21 @@
+
+# --- Managed by tpm at runtime 
+setup/tmux/plugins/
+
+# --- Editor/dpkg backup cruft 
+*.save
+tools/PrivHound/
+
+# --- Personal/sensitive
+vpns/*.ovpn
+
+# --- OS / editor noise ---
+.DS_Store
+*.swp
+*~
+__pycache__/
+*.pyc
+
+
+# --- Host-side MCP wrapper scripts (not exegol container config) ---
+/*-mcp-*

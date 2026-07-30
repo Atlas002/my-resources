@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+openvpn --config /opt/my-resources/vpns/academy-regular.ovpn --daemon

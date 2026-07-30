@@ -1,0 +1,12 @@
+# Config file dedicated to the user's personal history shared between all exegol containers
+
+ # -=-=-=-=-=-=-=- CUSTOM HISTORY  -=-=-=-=-=-=-=- #
+exegoltime --status
+exegoltime --off
+exegoltime $TARGET
+listen 4444
+listen 4444 --linux 
+smbacl_crawler.py //$TARGET/$SHARE -u $USER -p $PASSWORD -d $DOMAIN --start-path "SubDir\\Nested" --depth 3 --interesting-only --ldap
+smbacl_crawler.py //$TARGET/$SHARE -u $USER -p $PASSWORD -d $DOMAIN --interesting-only --ldap
+smbacl_crawler.py //$TARGET/$SHARE -u $USER -p $PASSWORD -d $DOMAIN
+ # -=-=-=-=-=-=-=- YOUR COMMANDS BELOW -=-=-=-=-=-=-=- #

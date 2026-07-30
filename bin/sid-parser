@@ -1,0 +1,198 @@
+#!/bin/bash
+#
+# SID Parser - Extract Domain SID and User RID from Windows SIDs
+# Useful for Silver Ticket attacks and AD enumeration
+#
+# Usage:
+#     ./sid_parser.sh <SID>
+#     ./sid_parser.sh -q <SID>    # Quiet mode for scripting
+#
+# Accepts both formats:
+#     - Hex blob: 0105000000000005150000005b7bb0f398aa2245ad4a1ca451040000
+#     - String format: S-1-5-21-4088429403-1159899800-2753317549-1105
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Parse arguments
+QUIET=false
+if [[ "$1" == "-q" || "$1" == "--quiet" ]]; then
+    QUIET=true
+    shift
+fi
+
+SID_INPUT="$1"
+
+if [[ -z "$SID_INPUT" ]]; then
+    echo "Usage: $0 [-q] <SID>"
+    echo ""
+    echo "  SID can be hex blob or S-1-5-21-... format"
+    echo "  -q, --quiet   Only output Domain SID and RID"
+    exit 1
+fi
+
+# Function to convert little-endian hex to decimal
+le_hex_to_dec() {
+    local hex="$1"
+    # Reverse byte order (little-endian to big-endian)
+    local reversed=""
+    for ((i=${#hex}-2; i>=0; i-=2)); do
+        reversed+="${hex:$i:2}"
+    done
+    # Convert to decimal
+    echo $((16#$reversed))
+}
+
+# Function to convert big-endian hex to decimal
+be_hex_to_dec() {
+    local hex="$1"
+    echo $((16#$hex))
+}
+
+# Check if input is hex or string format
+is_hex_sid() {
+    local input="$1"
+    # Remove common prefixes
+    input="${input//0x/}"
+    input="${input//b\'/}"
+    input="${input//\'/}"
+    input="${input,,}"  # lowercase
+    
+    # Check if it's valid hex and doesn't start with 's-'
+    if [[ "$input" =~ ^[0-9a-f]+$ ]] && [[ ${#input} -ge 16 ]] && [[ ! "$input" =~ ^73 ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Parse hex SID to string format
+hex_to_sid_string() {
+    local hex="$1"
+    # Clean the input
+    hex="${hex//0x/}"
+    hex="${hex//b\'/}"
+    hex="${hex//\'/}"
+    hex="${hex,,}"
+    
+    # Extract components
+    local revision=$((16#${hex:0:2}))
+    local sub_auth_count=$((16#${hex:2:2}))
+    local authority_hex="${hex:4:12}"
+    local authority=$(be_hex_to_dec "$authority_hex")
+    
+    # Build SID string
+    local sid_string="S-${revision}-${authority}"
+    
+    # Extract sub-authorities (each is 4 bytes / 8 hex chars, little-endian)
+    local offset=16
+    for ((i=0; i<sub_auth_count; i++)); do
+        local sub_auth_hex="${hex:$offset:8}"
+        local sub_auth=$(le_hex_to_dec "$sub_auth_hex")
+        sid_string+="-${sub_auth}"
+        offset=$((offset + 8))
+    done
+    
+    echo "$sid_string"
+}
+
+# Parse SID string and extract components
+parse_sid_string() {
+    local sid="$1"
+    
+    # Remove 'S-' prefix if present and split by '-'
+    sid="${sid#S-}"
+    sid="${sid#s-}"
+    
+    IFS='-' read -ra PARTS <<< "$sid"
+    
+    REVISION="${PARTS[0]}"
+    AUTHORITY="${PARTS[1]}"
+    
+    # All parts except last are domain SID components
+    SUB_AUTHORITIES=("${PARTS[@]:2}")
+    
+    # Domain SID is everything except the last sub-authority
+    DOMAIN_SID="S-${REVISION}-${AUTHORITY}"
+    for ((i=0; i<${#SUB_AUTHORITIES[@]}-1; i++)); do
+        DOMAIN_SID+="-${SUB_AUTHORITIES[$i]}"
+    done
+    
+    # User RID is the last sub-authority
+    USER_RID="${SUB_AUTHORITIES[-1]}"
+}
+
+# Main logic
+if is_hex_sid "$SID_INPUT"; then
+    SID_STRING=$(hex_to_sid_string "$SID_INPUT")
+    INPUT_TYPE="hex"
+else
+    SID_STRING="$SID_INPUT"
+    # Normalize - ensure it starts with S-
+    if [[ ! "$SID_STRING" =~ ^[Ss]- ]]; then
+        SID_STRING="S-$SID_STRING"
+    fi
+    SID_STRING="${SID_STRING^^}"  # uppercase
+    SID_STRING="S${SID_STRING#S}"  # ensure capital S
+    INPUT_TYPE="string"
+fi
+
+# Parse the SID
+parse_sid_string "$SID_STRING"
+
+# Output
+if $QUIET; then
+    echo "$DOMAIN_SID"
+    echo "$USER_RID"
+else
+    echo ""
+    echo -e "${CYAN}============================================================${NC}"
+    echo -e "${CYAN}SID PARSER - Silver Ticket Helper${NC}"
+    echo -e "${CYAN}============================================================${NC}"
+    
+    if [[ "$INPUT_TYPE" == "hex" ]]; then
+        echo ""
+        echo -e "[*] Input (hex):     $SID_INPUT"
+        echo -e "[*] Converted SID:   $SID_STRING"
+    else
+        echo ""
+        echo -e "[*] Input SID:       $SID_STRING"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    echo -e "${YELLOW}EXTRACTED VALUES (for Silver Ticket)${NC}"
+    echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    echo ""
+    echo -e "${GREEN}[+] Domain SID:      $DOMAIN_SID${NC}"
+    echo -e "${GREEN}[+] User RID:        $USER_RID${NC}"
+    
+    echo ""
+    echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    echo -e "${YELLOW}FULL BREAKDOWN${NC}"
+    echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    echo ""
+    echo "    Revision:        $REVISION"
+    echo "    Authority:       $AUTHORITY"
+    echo "    Sub-authorities: ${SUB_AUTHORITIES[*]}"
+    
+    echo ""
+    echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    echo -e "${YELLOW}COMMON RIDS REFERENCE${NC}"
+    echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    echo ""
+    echo "    500  - Administrator"
+    echo "    501  - Guest"
+    echo "    502  - krbtgt"
+    echo "    512  - Domain Admins"
+    echo "    513  - Domain Users"
+    echo "    515  - Domain Computers"
+    echo "    516  - Domain Controllers"
+    echo "    519  - Enterprise Admins"
+    echo ""
+    echo -e "${CYAN}============================================================${NC}"
+    echo ""
+fi

@@ -1,0 +1,119 @@
+# Config file dedicated to the user's personal aliases shared between all exegol containers
+
+# --------------------- personal aliases ---------------------------------------------------------------------------
+alias ccat='/usr/bin/cat'
+alias cat='bat'
+#alias ls='opt/my-ressources/eza -l -h --icons --show-symlinks'
+#alias lsa='opt/my-ressources/eza -l -h --icons -a --show-symlinks'
+
+alias ls='eza -lh --group-directories-first --icons=auto'
+alias lt='eza --tree --level=2 --long --icons --git'
+alias llt='eza --tree'
+alias lsa='ls -a'
+#unalias ll
+alias ll='eza --long --icons --git --group-directories-first' 
+#readonly ll
+alias untar='tar -xvf'  # unpack tarball archives
+alias cbcp='wl-copy'    # pipe output to clipboard
+
+#-------------------- imported aliases -----------------------------------------------------------------
+
+# PATH
+alias opt='cd /opt'
+alias ws='cd /workspace'
+alias wsu='cd /workspace/uploads'
+alias wsd='cd /workspace/downloads'
+alias wso='cd /workspace/outputs'
+
+# QUICK ACCESS
+alias get_tool='cd /opt && cp `fzf -e` /workspace/uploads && cd /workspace/uploads'
+
+
+# ENCODING
+alias urlencode='python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))"'
+alias urldecode='python3 -c "import urllib.parse,sys; print(urllib.parse.unquote(sys.argv[1]))"'
+
+# ---------------------- functions ----------------------------------------------------------------------------------------
+
+#wrap command in faketime through ligolo
+fakelig() {
+  faketime "$(ntpdate -q 240.0.0.1 | cut -d " " -f 1,2)" "$@"
+}
+
+
+
+# Returns 0 if TCP port is already LISTENing, 1 otherwise
+port_in_use () {
+  local port="$1"
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -H -ltn "sport = :$port" | grep -q .
+    return $?
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$port" -sTCP:LISTEN -Pn >/dev/null 2>&1
+    return $?
+  else
+    echo "Need 'ss' (iproute2) or 'lsof' to check ports." >&2
+    return 2
+  fi
+}
+
+pyserv () {
+  # usage: pyserv2 [port] [directory]
+  local port="${1:-8000}"
+  local dir="${2:-.}"
+
+  # get tun0 ip for display / bind
+  local tun0_ip
+  tun0_ip="$(ip -4 addr show tun0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)"
+
+  # check if tun0 looks alive
+  if [[ -z "$tun0_ip" ]]; then
+    echo "tun0 looks down (no IPv4), canceling..." >&2
+    return 1
+  fi
+
+  # validate port
+  if ! [[ "$port" =~ ^[0-9]{1,5}$ ]] || (( port < 1 || port > 65535 )); then
+    echo "Invalid port: $port" >&2
+    return 2
+  fi
+
+  # validate directory (optional)
+  if [[ ! -d "$dir" ]]; then
+    echo "Directory not found: $dir" >&2
+    return 3
+  fi
+
+  # check if port is already in use
+  if port_in_use "$port"; then
+    echo "Port $port is already in use." >&2
+    return 4
+  fi
+
+  echo "HTTP server running @ http://$tun0_ip:$port (dir: $dir)"
+  python3 -m http.server "$port" --bind "$tun0_ip" --directory "$dir"
+}
+
+
+
+
+if command -v eza &> /dev/null; then
+  alias ls='eza -lh --group-directories-first --icons=auto'
+  alias lsa='ls -a'
+  alias lt='eza --tree --level=2 --long --icons --git'
+  alias lta='lt -a'
+fi
+
+if command -v zoxide &> /dev/null; then
+  alias cd="zd"
+  zd() {
+    if [ $# -eq 0 ]; then
+      builtin cd ~ && return
+    elif [ -d "$1" ]; then
+      builtin cd "$1"
+    else
+      z "$@" && printf "\U000F17A9 " && pwd || echo "Error: Directory not found"
+    fi
+  }
+fi
