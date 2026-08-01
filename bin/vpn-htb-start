@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-openvpn --config /opt/my-resources/vpns/starting_point_Atlas02.ovpn --daemon
