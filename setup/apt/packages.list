@@ -11,3 +11,4 @@ faketime
 docker.io
 docker-compose
 trivy
+termshark
