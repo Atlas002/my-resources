@@ -11,7 +11,7 @@ alias lt='eza --tree --level=2 --long --icons --git'
 alias llt='eza --tree'
 alias lsa='ls -a'
 #unalias ll
-alias ll='eza --long --icons --git --group-directories-first' 
+alias ll='eza --long --icons --git --group-directories-first -a -h' 
 #readonly ll
 alias untar='tar -xvf'  # unpack tarball archives
 alias cbcp='wl-copy'    # pipe output to clipboard
