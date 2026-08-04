@@ -195,6 +195,16 @@
             "Install": [
                 "/opt/tools/firefox/cacert.der"
             ]
+        },
+        "Preferences": {
+            "extensions.activeThemeID": {
+                "Value": "firefox-compact-dark@mozilla.org",
+                "Status": "default"
+            },
+            "layout.css.prefers-color-scheme.content-override": {
+                "Value": 0,
+                "Status": "default"
+            }
         }
     }
 }
